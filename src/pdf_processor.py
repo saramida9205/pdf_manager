@@ -448,7 +448,7 @@ class PDFProcessor:
         # 2. Add new highlights if text is given
         found_pages = []
         if text:
-            text = text.lower() # case-insensitive mostly
+            # text = text.lower() # Removed to allow exact match
             for i in range(self._document.page_count):
                 page = self._document[i]
                 rects = page.search_for(text)

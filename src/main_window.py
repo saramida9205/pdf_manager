@@ -283,6 +283,14 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'search_label'): self.search_label.setText(f"{self.current_search_idx + 1}/{len(self.search_results)}")
         self.go_to_page(page)
 
+
+    def go_to_page(self, page_number):
+        if hasattr(self, 'page_list_widget'):
+            item = self.page_list_widget.item(page_number)
+            if item:
+                self.page_list_widget.setCurrentItem(item)
+                self.page_list_widget.scrollToItem(item)
+
     def clear_search(self):
         if hasattr(self, 'search_results'):
             self.search_results = []
