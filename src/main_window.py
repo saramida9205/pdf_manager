@@ -254,18 +254,31 @@ class MainWindow(QMainWindow):
                 self.open_file_by_path(paths[0])
 
     def perform_search(self):
-        if not hasattr(self, 'search_input'): return
+        print("perform_search triggered!")
+        if not hasattr(self, 'search_input'):
+            print("No search_input found!")
+            return
         query = self.search_input.text()
+        print(f"Query: {query}")
         if not query:
+            print("Query empty!)")
             self.clear_search()
             return
             
-        self.search_results = self.processor.highlight_search(query)
+        print("Calling highlight_search...")
+        try:
+            self.search_results = self.processor.highlight_search(query)
+            print("search_results:", self.search_results)
+        except Exception as e:
+            print("Error in highlight_search:", e)
+            self.search_results = []
+            
         self.current_search_idx = -1
         
         if self.search_results:
             self.search_next()
         else:
+            print("Showing QMessageBox: No text found")
             QMessageBox.information(self, "검색 결과", "일치하는 텍스트가 없습니다.")
             if hasattr(self, 'search_label'): self.search_label.setText("0/0")
 
@@ -288,14 +301,18 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'page_list_widget'):
             item = self.page_list_widget.item(page_number)
             if item:
+                # If current item is exactly what we are selecting, currentItemChanged won't fire
+                # So we explicitly re-render the page to capture the new highlights
                 self.page_list_widget.setCurrentItem(item)
                 self.page_list_widget.scrollToItem(item)
+                self.render_page(page_number)
 
     def clear_search(self):
         if hasattr(self, 'search_results'):
             self.search_results = []
         if hasattr(self, 'search_label'): self.search_label.setText("")
-        if self.processor.is_open:
+        if hasattr(self, 'processor') and self.processor.is_open:
+            self.processor.highlight_search("")
             if hasattr(self, 'page_list_widget'):
                 self.render_page(self.page_list_widget.currentRow())
 
