@@ -1,10 +1,10 @@
 [Setup]
 AppName=PDF Manager
-AppVersion=1.0
+AppVersion=2.0
 DefaultDirName={autopf}\PDF Manager
 DefaultGroupName=PDF Manager
 OutputDir=dist
-OutputBaseFilename=PDF_Manager_Setup
+OutputBaseFilename=PDF_Manager_Setup_v2.0
 Compression=lzma2
 SolidCompression=yes
 SetupIconFile=icon.ico

@@ -325,26 +325,34 @@ class PDFProcessor:
             return len(self._document)
         return 0
 
+    def clear_cache(self):
+        if hasattr(self, '_image_cache'): self._image_cache.clear()
+
     def get_page_image(self, page_number, zoom_factor=1.0):
         """
         주어진 페이지 번호(0-indexed)의 이미지를 PIL Image 객체로 반환합니다.
-        해상도는 zoom_factor로 조절 가능합니다.
+        해상도는 zoom_factor로 조절 가능합니다. (캐시 적용)
         """
-        if not self._document or page_number < 0 or page_number >= len(self._document):
+        if not hasattr(self, '_image_cache'): self._image_cache = {}
+        
+        if not self.is_open or page_number < 0 or page_number >= self.page_count:
             return None
-
+            
+        cache_key = (page_number, float(zoom_factor))
+        if cache_key in self._image_cache:
+            return self._image_cache[cache_key]
+            
         page = self._document.load_page(page_number)
-        
-        # 확대 비율 조절 매트릭스
         mat = fitz.Matrix(zoom_factor, zoom_factor)
-        
-        # 페이지를 pixmap 형식으로 렌더링
         pix = page.get_pixmap(matrix=mat, alpha=False)
         
-        # Pixmap 이미지를 PIL Image 객체로 변환
-        # fitz pixmap 데이터는 RGB 형식이므로 'RGB' 모드로 읽음
-        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        mode = "RGB" if pix.n == 3 else "RGBA"
+        img = Image.frombytes(mode, [pix.w, pix.h], pix.samples)
         
+        if len(self._image_cache) > 20: 
+            self._image_cache.pop(next(iter(self._image_cache)))
+            
+        self._image_cache[cache_key] = img
         return img
 
     def get_page_text(self, page_number):
@@ -356,6 +364,104 @@ class PDFProcessor:
             
         page = self._document.load_page(page_number)
         return page.get_text()
+
+
+    def add_watermark(self, output_path, wm_type="text", content="", pages="all", position="center", opacity=0.5, color=(0.4, 0.4, 0.4)):
+        if not self.is_open:
+            return False, "열려있는 문서가 없습니다."
+            
+        try:
+            out_pdf = fitz.open()
+            out_pdf.insert_pdf(self._document)
+            
+            for i in range(out_pdf.page_count):
+                if pages != "all" and i not in pages:
+                    continue
+                    
+                page = out_pdf[i]
+                rect = page.rect
+                
+                if wm_type == "text":
+                    font_size = min(rect.width, rect.height) / 8
+                    
+                    # Estimate text width (rough)
+                    text_length = fitz.get_text_length(content, fontname="helv", fontsize=font_size)
+                    
+                    if position == "center":
+                        x = (rect.width - text_length) / 2
+                        y = (rect.height + font_size) / 2
+                    elif position == "top_left":
+                        x = 50
+                        y = 50 + font_size
+                    elif position == "bottom_right":
+                        x = rect.width - text_length - 50
+                        y = rect.height - 50
+                    else: # default
+                        x, y = 50, 50
+                        
+                    point = fitz.Point(x, y)
+                    page.insert_text(point, content, fontsize=font_size, color=color, fill_opacity=opacity)
+                    
+                elif wm_type == "image":
+                    import os
+                    if not os.path.exists(content):
+                        continue
+                        
+                    # Calculate position (center 50% width)
+                    w = rect.width * 0.5
+                    h = rect.height * 0.5
+                    
+                    if position == "center":
+                        x0 = (rect.width - w) / 2
+                        y0 = (rect.height - h) / 2
+                    elif position == "top_left":
+                        x0, y0 = 50, 50
+                    elif position == "bottom_right":
+                        x0 = rect.width - w - 50
+                        y0 = rect.height - h - 50
+                    else:
+                        x0, y0 = 50, 50
+                        
+                    img_rect = fitz.Rect(x0, y0, x0 + w, y0 + h)
+                    page.insert_image(img_rect, filename=content, keep_proportion=True) # opacity may not be directly supported without altering alpha
+                    
+            out_pdf.save(output_path, garbage=4, deflate=True)
+            out_pdf.close()
+            return True, ""
+        except Exception as e:
+            return False, str(e)
+
+
+    def highlight_search(self, text):
+        if not self.is_open:
+            return []
+            
+        self.clear_cache()
+            
+        # 1. Remove old search highlights
+        for i in range(self._document.page_count):
+            page = self._document[i]
+            for annot in page.annots():
+                if annot.info.get("title") == "SearchHighlight":
+                    page.delete_annot(annot)
+                    
+        # 2. Add new highlights if text is given
+        found_pages = []
+        if text:
+            text = text.lower() # case-insensitive mostly
+            for i in range(self._document.page_count):
+                page = self._document[i]
+                rects = page.search_for(text)
+                if rects:
+                    if i not in found_pages:
+                        found_pages.append(i)
+                    for rect in rects:
+                        annot = page.add_highlight_annot(rect)
+                        info = annot.info
+                        info["title"] = "SearchHighlight"
+                        annot.set_info(info)
+                        annot.update()
+        return found_pages
 
     def save_as_images(self, output_dir_or_file, img_format="png", zoom_factor=2.0):
         """
