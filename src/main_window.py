@@ -42,6 +42,7 @@ class MainWindow(QMainWindow):
 
         # 메뉴 설정
         self.create_menu()
+        self.create_toolbar()
 
         # 중앙 위젯 설정
         central_widget = QWidget()
@@ -111,6 +112,38 @@ class MainWindow(QMainWindow):
         
         # Splitter 비율 설정 (왼쪽 20%, 오른쪽 80%)
         splitter.setSizes([200, 800])
+
+
+    def create_toolbar(self):
+        toolbar = self.addToolBar("Main Toolbar")
+        toolbar.setMovable(False)
+        
+        # Search UI
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("텍스트 검색...")
+        self.search_input.setFixedWidth(200)
+        self.search_input.returnPressed.connect(self.perform_search)
+        
+        search_btn = QPushButton("검색")
+        search_btn.clicked.connect(self.perform_search)
+        
+        self.search_prev_btn = QPushButton("◀")
+        self.search_prev_btn.clicked.connect(self.search_prev)
+        self.search_prev_btn.setToolTip("이전 결과")
+        
+        self.search_next_btn = QPushButton("▶")
+        self.search_next_btn.clicked.connect(self.search_next)
+        self.search_next_btn.setToolTip("다음 결과")
+        
+        self.search_label = QLabel("")
+        self.search_label.setStyleSheet("color: #7f8fa6; margin: 0 5px;")
+        
+        toolbar.addWidget(QLabel("   검색: "))
+        toolbar.addWidget(self.search_input)
+        toolbar.addWidget(search_btn)
+        toolbar.addWidget(self.search_prev_btn)
+        toolbar.addWidget(self.search_next_btn)
+        toolbar.addWidget(self.search_label)
 
     def create_menu(self):
         menubar = self.menuBar()
